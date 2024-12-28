@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -31,25 +32,68 @@ app.post('/send-pix', async (req, res) => {
 
   const options = {
     method: 'POST',
+    url,
     headers: {
       accept: 'application/json',
       'content-type': 'application/json',
-      access_token: '$aact_MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmVlMmE2ZjQwLWQ4YjktNDI4My04NjIxLTkyZmNhNTk5ZjRhNTo6JGFhY2hfZTRkYzY4YjMtZDgyNS00Mzc5LWJhY2UtOTNlZjFhNTVkZTA5',
+      access_token: process.env.ASAAS_ACCESS_TOKEN || 'SEU_ACCESS_TOKEN',
     },
     data,
-    url,
   };
 
   try {
-    const response = await axios(options);
+    const response = await axios.request(options);
     res.status(200).json(response.data);
   } catch (error) {
-    console.error(error);
+    console.error('Error processing the Pix transfer:', error.response?.data || error.message);
     res.status(500).json({ error: 'Error processing the Pix transfer' });
   }
 });
 
-// Iniciar o servidor
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+// Endpoint para receber PIX
+app.post('/receive-pix', async (req, res) => {
+    const { value, description } = req.body;
+  
+    if (!description || !value) {
+      return res.status(400).json({ error: 'Empty Pix value and description' });
+    }
+  
+    const url = 'https://www.asaas.com/api/v3/paymentLinks';
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        access_token: process.env.ASAAS_ACCESS_TOKEN || 'SEU_ACCESS_TOKEN',
+    },
+      body: JSON.stringify({
+        billingType: 'UNDEFINED',
+        chargeType: 'DETACHED',
+        name: 'Convite Perfeito',
+        value,
+        dueDateLimitDays: 2,
+        description,
+      }),
+    };
+  
+    try {
+      const response = await fetch(url, options);
+      const data = await response.json();
+  
+      // Verifica se a API retornou o campo `url`
+      if (data && data.url) {
+        return res.status(200).json({ url: data.url });
+      } else {
+        return res.status(500).json({ error: 'Failed to retrieve payment URL' });
+      }
+    } catch (error) {
+      console.error('Error processing Pix payment link:', error.message);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+  
+  // Iniciar o servidor
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Server running on port ${port}`);
+  });
+  
